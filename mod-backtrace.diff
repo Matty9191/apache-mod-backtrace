@@ -1,0 +1,49 @@
+--- mod-backtrace.c.dl	Thu Dec 29 11:25:29 2005
++++ mod-backtrace.c	Thu Dec 29 11:22:06 2005
+@@ -13,8 +13,8 @@
+  * limitations under the License.
+  */
+ 
+-#if !defined(__linux__) && !defined(__FreeBSD__)
+-#error This module is currently implemented only for Linux and FreeBSD.
++#if !defined(__linux__) && !defined(__FreeBSD__) && !(defined(__SVR4) && defined(__sun))
++#error This module is currently implemented only for Linux, FreeBSD and Solaris.
+ #endif
+ 
+ /*
+@@ -73,13 +73,20 @@
+ #include "apr_strings.h"
+ 
+ #include <unistd.h>
++
++
++#if defined(__linux__) && defined(__FreeBSD__)
+ #include <execinfo.h>
++#elif (defined(__SVR4) && defined(__sun))
++#include <ucontext.h>
++#endif
++
+ #include <fcntl.h>
+ 
+ static pid_t real_pid;
+ static const char *log_fname;
+ 
+-static int bt_exception_hook(ap_exception_info_t *ei)
++int bt_exception_hook(ap_exception_info_t *ei)
+ {
+     int msg_len;
+     int logfd;
+@@ -135,8 +142,13 @@
+                            main);/* don't you DARE put parens after "main" */
+     write(logfd, buffer, msg_len);
+ 
++    #if defined(__linux__) || defined(__FreeBSD__)
+     size = backtrace(array, sizeof array / sizeof array[0]);
+     backtrace_symbols_fd(array, size, logfd);
++    #elif defined(__SVR4) && defined(__sun)
++    printstack(logfd);
++    #endif
++
+     msg_len = apr_snprintf(buffer, sizeof buffer,
+                            "%s end of backtrace\n",
+                            msg_prefix);
